@@ -17,7 +17,7 @@ namespace LLaMA.NET.LibLoader
                 case "linux":
                     LinuxLoader.LibraryLoad(libEnv.LibraryPath);
                     break;
-                case "mac":
+                case "osx":
                     MacLoader.LibraryLoad(libEnv.LibraryPath);
                     break;
             }

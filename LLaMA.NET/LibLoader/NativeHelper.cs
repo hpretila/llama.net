@@ -46,13 +46,13 @@ namespace LLaMA.NET.LibLoader
                 {
                     arch = "x86";
                 }
-                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm)
-                {
-                    arch = "arm";
-                }
                 else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
                 {
                     arch = "arm64";
+                }
+                else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm)
+                {
+                    arch = "arm";
                 }
 
                 if (os == "generic" || arch == "generic")

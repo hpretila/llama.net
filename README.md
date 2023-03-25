@@ -7,6 +7,9 @@
 To build the library, you need to have [CMake](https://cmake.org/) and Python installed. Then, run the following commands at the root of the repository.
 
 ```bash
+# Pull the submodules
+git submodule update --init --recursive
+
 # Build and prepare the C++ library
 python scripts/build_llama_cpp.py
 ```

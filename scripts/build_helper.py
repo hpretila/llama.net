@@ -35,10 +35,12 @@ def llama_dll():
         arch = "x64"
     elif platform.machine() == "x86" or platform.machine() == "i386" or platform.machine() == "i686":
         arch = "x86"
-    elif platform.machine().startswith("arm"):
-        arch = "arm"
     elif platform.machine().startswith("aarch64"):
         arch = "arm64"
+    elif platform.machine().startswith("arm64"):
+        arch = "arm64"
+    elif platform.machine().startswith("arm"):
+        arch = "arm"
 
     if os_name == "generic" or arch == "generic":
         raise OSError("The current platform is not supported.")
