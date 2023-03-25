@@ -1,4 +1,5 @@
 using LLaMA.NET.Native;
+using LLaMA.NET.LibLoader;
 
 namespace LLaMA.NET
 {
@@ -23,6 +24,8 @@ namespace LLaMA.NET
         /// <param name="modelPath">The path to the model.</param>
         public static LLaMAModel FromPath(string modelPath)
         {
+            LibLoader.LibLoader.LibraryLoad();
+
             return new LLaMAModel(
                 LLaMANativeMethods.llama_init_from_file(
                     modelPath, 

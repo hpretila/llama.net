@@ -1,15 +1,21 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 
-namespace LLaMA.NET.Native
+namespace LLaMA.NET.LibLoader
 {
+    public struct LibraryEnvironment {
+        public string LibraryPath { get; set; }
+        public string OperatingSystem { get; set; }
+    }
+
     public static class NativeHelper{
         public const string LLAMA_DLL = "libllama";
         
-        public static string GetNativeLibraryName {
+        public static LibraryEnvironment GetNativeLibraryEnvironment {
             get {
                 // Temporary placeholder
-                var filename = "libllama";
+                var filename = "llama";
                 var os = "generic";
                 var arch = "generic";
                 var ext = "";
@@ -55,7 +61,14 @@ namespace LLaMA.NET.Native
                 }
 
                 // Return the path
-                return $"{os}-{arch}\\{filename}{ext}";
+                return new LibraryEnvironment{
+                    LibraryPath = Path.Combine(
+                        AppContext.BaseDirectory, 
+                        "runtimes",
+                        $"{os}-{arch}", 
+                        $"{filename}{ext}"),
+                    OperatingSystem = os
+                };
             }
         }   
     }

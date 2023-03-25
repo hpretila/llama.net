@@ -41,55 +41,55 @@ namespace LLaMA.NET.Native
     public static class LLaMANativeMethods
     {
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLaMAContextParams llama_context_default_params();
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr llama_init_from_file(string path_model, LLaMAContextParams parameters);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern void llama_free(IntPtr context);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern int llama_model_quantize(string fname_inp, string fname_out, int itype, int qk);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern int llama_eval(IntPtr context, [In] llama_token[] tokens, int n_tokens, int n_past, int n_threads);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern int llama_tokenize(IntPtr context, string text, [Out] llama_token[] tokens, int n_max_tokens, bool add_bos);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern int llama_n_vocab(IntPtr context);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern int llama_n_ctx(IntPtr context);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr llama_get_logits(IntPtr context);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr llama_get_embeddings(IntPtr context);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr llama_token_to_str(IntPtr context, llama_token token);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern llama_token llama_token_bos();
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern llama_token llama_token_eos();
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern llama_token llama_sample_top_p_top_k(IntPtr context, [In] llama_token[] last_n_tokens_data, int last_n_tokens_size, int top_k, double top_p, double temp, double repeat_penalty);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern void llama_print_timings(IntPtr context);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern void llama_reset_timings(IntPtr context);
 
-        [DllImport(NativeHelper.LLAMA_DLL, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr llama_print_system_info();
     }
 }

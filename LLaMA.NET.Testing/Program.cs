@@ -8,7 +8,13 @@ using System.Runtime.InteropServices;
 
 using LLaMA.NET;
 using LLaMA.NET.Native;
+using LLaMA.NET.LibLoader;
 using llama_token = System.Int32;
+
+static void Test_Model_Quantisation()
+{
+
+}
 
 static void Test_Native_Inference()
 {
@@ -19,13 +25,15 @@ static void Test_Native_Inference()
     const string prompt = " This is the story of a man named ";
     IntPtr ctx;
 
+    LibLoader.LibraryLoad();
+
     var lparams = LLaMANativeMethods.llama_context_default_params();
 
     // load model
     ctx = LLaMANativeMethods.llama_init_from_file(
-                "/mnt/d/LLaMA/7B-LoRA/ggml-model-q4_0.bin", 
-                lparams
-        );
+        System.IO.Path.Join("weights","7B-LoRA","ggml-model-q4_0.bin"),
+        lparams
+    );
 
     // convert prompt to embedings
     var embd_inp = new llama_token[prompt.Length + 1];
@@ -72,7 +80,7 @@ static void Test_API_Inference () {
     
     const int nTokensToPredict = 50;
 
-    LLaMAModel model = LLaMAModel.FromPath("/mnt/d/LLaMA/7B-LoRA/ggml-model-q4_0.bin");
+    LLaMAModel model = LLaMAModel.FromPath(System.IO.Path.Join("weights","7B-LoRA","ggml-model-q4_0.bin"));
     LLaMARunner runner = model.CreateRunner()
         .WithPrompt(" This is the story of a man named ");
 
@@ -90,5 +98,5 @@ static void Test_API_Inference () {
     model.Dispose();
 }
 
-Test_Native_Inference();
 Test_API_Inference();
+Test_Native_Inference();

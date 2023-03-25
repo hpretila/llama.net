@@ -10,26 +10,30 @@ cwd = os.getcwd()
 
 def llama_dll():
     # Temporary placeholder
-    filename = "libllama"
+    filename = "llama"
     os_name = "generic"
     arch = "generic"
     ext = ""
+    build_artifact = ""
 
     # Get OS strings
     if platform.system() == "Windows":
         os_name = "win"
         ext = ".dll"
+        build_artifact = os.path.join("bin", "Debug", "llama.dll")
     elif platform.system() == "Linux":
         os_name = "linux"
         ext = ".so"
+        build_artifact = f"lib{filename}{ext}"
     elif platform.system() == "Darwin":
         os_name = "osx"
         ext = ".dylib"
+        build_artifact = f"lib{filename}{ext}"
 
     # Get architecture string
-    if platform.machine() == "x86_64":
+    if platform.machine() == "x86_64" or platform.machine() == "AMD64":
         arch = "x64"
-    elif platform.machine() == "x86":
+    elif platform.machine() == "x86" or platform.machine() == "i386" or platform.machine() == "i686":
         arch = "x86"
     elif platform.machine().startswith("arm"):
         arch = "arm"
@@ -53,8 +57,8 @@ def llama_dll():
     dest = os.path.join(os_dir, f"{filename}{ext}")
 
     # Return the paths
-    return os.path.join(cwd, "llama.cpp","build", f"{filename}{ext}"), \
-        os.path.join(cwd, "LLaMA.NET", f"{filename}") # dest
+    return os.path.join(cwd, "llama.cpp","build", build_artifact), \
+        dest
 
 def build_llama_bin():
     """
@@ -85,10 +89,8 @@ def prepare_llama_bin():
 def build_llama_net():
     """
     Builds and runs the LLaMA.NET.Testing application
-    """
-    build_llama_bin()
-    prepare_llama_bin()
 
+    """
     # Run the LLaMA.NET application
     os.system('dotnet build LLaMA.NET/LLaMA.NET.csproj')
 
@@ -97,8 +99,6 @@ def run_test():
     """
     Builds and runs the LLaMA.NET.Testing application
     """
-    build_llama_bin()
-    prepare_llama_bin()
 
     # Run the LLaMA.NET application
     os.system('dotnet run --project LLaMA.NET.Testing/LLaMA.NET.Testing.csproj')
