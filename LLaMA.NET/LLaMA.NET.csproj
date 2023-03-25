@@ -5,6 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    
+    <PackageId>LLaMA.NET</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Huey Pretila</Authors>
+    <Company></Company>
+    <Product></Product>
   </PropertyGroup>
 
   <ItemGroup>
