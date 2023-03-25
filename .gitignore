@@ -1,0 +1,7 @@
+*/__pycache__/*
+
+LLaMA.NET/libllama*
+
+*/obj/
+*/lib/llama*
+*/bin/
