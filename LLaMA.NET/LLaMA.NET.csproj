@@ -11,6 +11,8 @@
     <Authors>Huey Pretila</Authors>
     <Company></Company>
     <Product></Product>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>

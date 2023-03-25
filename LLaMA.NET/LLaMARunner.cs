@@ -10,7 +10,7 @@ namespace LLaMA.NET
         private LLaMAModel _model;
         private string _prompt = "";
         private int _N_THREADS = 8;
-        private llama_token[] _embeds;
+        private llama_token[] _embeds = {};
 
         public LLaMARunner(LLaMAModel model)
         {
@@ -34,7 +34,7 @@ namespace LLaMA.NET
             }
 
             // Add it and pass it along 😋
-            this._embeds = inputEmbeds;
+            this._embeds = this._embeds.Concat(inputEmbeds).ToArray();
 
             return this;
         }
@@ -45,7 +45,7 @@ namespace LLaMA.NET
             return this;
         }
 
-        public string Infer(out bool isEos, int nTokensToPredict)
+        public string Infer(out bool isEos, int nTokensToPredict = 50)
         {
             isEos = false;
             var prediction = "";
@@ -79,10 +79,13 @@ namespace LLaMA.NET
             return prediction;
         }
 
+        public void Clear()
+        {
+            this._embeds = new llama_token[] {};
+        }
+
         public void Dispose()
         {
-            // Reset the model
-            LLaMANativeMethods.llama_eval(_model.ctx.Value, new llama_token[]{}, 0, 0, _N_THREADS);
         }
     }
 }
