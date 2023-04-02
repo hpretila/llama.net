@@ -25,12 +25,12 @@ namespace LLaMA.NET
             var inputEmbeds = new llama_token[prompt.Length + 1];
             var inputTokenLength = LLaMANativeMethods.llama_tokenize(_model.ctx.Value, prompt, inputEmbeds, inputEmbeds.Length, true);
             Array.Resize(ref inputEmbeds, inputTokenLength);
-
+            
             // Evaluate the prompt
             for (int i = 0; i < inputEmbeds.Length; i++)
             {
                 // batch size 1
-                LLaMANativeMethods.llama_eval(_model.ctx.Value, new llama_token[] { inputEmbeds[i] }, 1, i, _N_THREADS);
+                LLaMANativeMethods.llama_eval(_model.ctx.Value, new llama_token[] { inputEmbeds[i] }, 1, this._embeds.Length + i, _N_THREADS);
             }
 
             // Add it and pass it along 😋

@@ -22,7 +22,7 @@ static void Test_Native_Inference()
         
     const int N_THREADS = 8;
     const int nTokensToPredict = 50;
-    const string prompt = " This is the story of a man named ";
+    const string prompt = "### Instruction ###\nTell me about Emanuel Macron, King of France.\n### Response ###\n";
     IntPtr ctx;
 
     LibLoader.LibraryLoad();
@@ -31,7 +31,7 @@ static void Test_Native_Inference()
 
     // load model
     ctx = LLaMANativeMethods.llama_init_from_file(
-        System.IO.Path.Join("weights","7B-LoRA","ggml-model-q4_0.bin"),
+        System.IO.Path.Join("/path/to/llama-7b-lora","ggml-model-q4_0.bin"),
         lparams
     );
 
@@ -80,9 +80,9 @@ static void Test_API_Inference () {
     
     const int nTokensToPredict = 50;
 
-    LLaMAModel model = LLaMAModel.FromPath(System.IO.Path.Join("weights","7B-LoRA","ggml-model-q4_0.bin"));
+    LLaMAModel model = LLaMAModel.FromPath(System.IO.Path.Join("/Volumes/AI DRIVE/weights/llama-7b-lora","ggml-model-q4_0.bin"));
     LLaMARunner runner = model.CreateRunner()
-        .WithPrompt(" This is the story of a man named ");
+        .WithPrompt("### Instruction ###\nTell me about Emanuel Macron, King of France.\n### Response ###\n");
 
     int i = 0;
     bool stop = false || i >= nTokensToPredict;
@@ -98,5 +98,40 @@ static void Test_API_Inference () {
     model.Dispose();
 }
 
-Test_API_Inference();
-Test_Native_Inference();
+
+static void Test_API_Inference_Interactive () {
+    Console.WriteLine("\n ======= Running Interactive API Test with LLaMA.NET... ==========");
+    
+    const int nTokensToPredict = 150;
+
+    LLaMAModel model = LLaMAModel.FromPath(System.IO.Path.Join("/Volumes/AI DRIVE/weights/llama-7b-lora","ggml-model-q4_0.bin"));
+    LLaMARunner runner = model.CreateRunner()
+        .WithPrompt("### Instruction ###\nTell me about Emanuel Macron, King of France.\n### Response ###\n");
+
+    int i = 0;
+    bool stop = false || i >= nTokensToPredict;
+    while (true) {
+        Console.Write ("\n> ");
+        string input = Console.ReadLine();
+        input = "### Instruction ###\n" + input + "\n### Response ###\n";
+        runner = runner.WithPrompt(input);
+        string response = "";
+        while (!stop) {
+            bool isEOS;
+            var res = runner.Infer(out isEOS, 1);
+            response += res;
+            Console.Write(res);
+            i++;
+
+            stop = isEOS || i >= nTokensToPredict || response.Contains("### Instruction");
+        }
+        i = 0;
+        stop = false;
+        response = response.Replace("### Instruction", "");
+    }
+
+    model.Dispose();
+}
+
+// Test_API_Inference();
+Test_API_Inference_Interactive();
