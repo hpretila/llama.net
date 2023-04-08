@@ -40,12 +40,12 @@ To run inference, you need to load a model and create a runner. The runner can t
 ```csharp
 using LLaMA.NET;
 
-LLaMAModel model = LLaMAModel.FromPath("/path/to/7B-LoRA/ggml-model-q4_0.bin");
+LLaMAModel model = LLaMAModel.FromPath("/path/to/your/ggml-model-q4_0.bin");
 LLaMARunner runner = model.CreateRunner()
-    .WithThreads(8)
-    .WithPrompt(" This is the story of a man named ");
+    .WithThreads(8);
 
-var res = runner.Infer(out _, nTokensToPredict = 50);
+var res = runner.WithPrompt(" This is the story of a man named ")
+    .Infer(out _, nTokensToPredict = 50);
 Console.Write(res);
 
 model.Dispose();

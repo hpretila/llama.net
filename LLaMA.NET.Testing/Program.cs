@@ -114,20 +114,22 @@ static void Test_API_Inference_Interactive () {
         Console.Write ("\n> ");
         string input = Console.ReadLine();
         input = "### Instruction ###\n" + input + "\n### Response ###\n";
-        runner = runner.WithPrompt(input);
+        runner = runner.WithThreads(4).WithPrompt(input);
         string response = "";
         while (!stop) {
             bool isEOS;
-            var res = runner.Infer(out isEOS, 1);
+            var res = runner.Infer(out isEOS, 5);
             response += res;
-            Console.Write(res);
+            Console.Write(".");
             i++;
 
             stop = isEOS || i >= nTokensToPredict || response.Contains("### Instruction");
         }
         i = 0;
         stop = false;
-        response = response.Replace("### Instruction", "");
+        if (response.Contains("### Instruction"))
+            response = response.Substring(0, response.IndexOf("### Instruction")).Trim();
+        Console.WriteLine("Done.\n" + response);
     }
 
     model.Dispose();

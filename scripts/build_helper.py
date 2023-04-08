@@ -9,26 +9,36 @@ cwd = os.getcwd()
 
 
 def llama_dll():
+    """
+    Grabs all of the directories for everything to sit in.
+
+    Returns:
+        str: Source directory for the library binary.
+        str: Destination directory for the library binary.
+        str: Binary directory.
+        str: Destination directory for this OS.
+    """
+
     # Temporary placeholder
     filename = "llama"
     os_name = "generic"
     arch = "generic"
-    ext = ""
-    build_artifact = ""
+    lib_ext = ""
+    build_artifact_lib = ""
 
     # Get OS strings
     if platform.system() == "Windows":
         os_name = "win"
-        ext = ".dll"
-        build_artifact = os.path.join("bin", "Debug", "llama.dll")
+        lib_ext = ".dll"
+        build_artifact_lib = os.path.join("bin", "Debug", "llama.dll")
     elif platform.system() == "Linux":
         os_name = "linux"
-        ext = ".so"
-        build_artifact = f"lib{filename}{ext}"
+        lib_ext = ".so"
+        build_artifact_lib = f"lib{filename}{lib_ext}"
     elif platform.system() == "Darwin":
         os_name = "osx"
-        ext = ".dylib"
-        build_artifact = f"lib{filename}{ext}"
+        lib_ext = ".dylib"
+        build_artifact_lib = f"lib{filename}{lib_ext}"
 
     # Get architecture string
     if platform.machine() == "x86_64" or platform.machine() == "AMD64":
@@ -56,17 +66,19 @@ def llama_dll():
         os.mkdir(os_dir)
 
     # Destination path
-    dest = os.path.join(os_dir, f"{filename}{ext}")
+    llama_source_dir = os.path.join(cwd, "llama.cpp","build", build_artifact_lib)
+    llama_dest_dir = os.path.join(os_dir, f"{filename}{lib_ext}")
+    llama_build_bin_dir = os.path.join(cwd, "llama.cpp","build", "bin")
 
     # Return the paths
-    return os.path.join(cwd, "llama.cpp","build", build_artifact), \
-        dest
+    return llama_source_dir, llama_dest_dir, llama_build_bin_dir, os_dir
 
 def build_llama_bin():
     """
     Builds the llama.cpp binary
     """
     # Prepare the llama.cpp/build directory; remove if it exists! Use path builder instead of strings to keep it cross-platform
+    print ("[BUILD] Clearing for build.")
     build_dir = os.path.join('llama.cpp', 'build')
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
@@ -75,23 +87,52 @@ def build_llama_bin():
     os.mkdir(build_dir)
 
     # Build the llama.cpp binary
+    print ("[BUILD] Invoking CMAKE.")
     os.system(f'cd {build_dir} && cmake -DBUILD_SHARED_LIBS=ON .. && cmake --build . && cd {cwd}')
 
 def prepare_llama_bin():
     """
-    Copies the llama.cpp binary to the LLaMA.NET/lib/llama directory
+    Copies the following to the LLaMA.NET/lib/llama directory:
+    - libllama - the model library
+    - convert-pth-to-ggml.py - the script to convert state dicts to ggml.
+    - quantize - the quantize executable for quantizing models further from ggml format.
+    - quantize.py - the script to invoke quantize.
     """
 
     # Find out what OS we've got
-    build_dir, dest_dir = llama_dll()
+    lib_build_dir, lib_dest_dir, build_dir, os_dest_dir = llama_dll()
 
-    shutil.copy(build_dir, dest_dir)
+    # Copy our library
+    print (f"[PREPARE] Copying libllama to {lib_dest_dir}.")
+    shutil.copy(lib_build_dir, lib_dest_dir)
+
+    # Copy our pth to ggml script
+    convert_py_build_dir = os.path.join(cwd, "llama.cpp","convert-pth-to-ggml.py")
+    convert_py_dest_dir = os.path.join(
+        os_dest_dir,"convert-pth-to-ggml.py")
+    print (f"[PREPARE] Copying convert-pth-to-ggml.py script to {convert_py_dest_dir}.")
+    shutil.copy(convert_py_build_dir, convert_py_dest_dir)
+
+    # Copy our quantize binary
+    executable_ext = "" if not "win" in lib_dest_dir else ".exe"
+    quantize_build_dir = os.path.join(
+        build_dir,f"quantize{executable_ext}")
+    quantize_dest_dir = os.path.join(
+        os_dest_dir,f"quantize{executable_ext}")
+    print (f"[PREPARE] Copying quantize to {quantize_dest_dir}.")
+    shutil.copy(quantize_build_dir, quantize_dest_dir)
+
+    # Copy our quantize script
+    quantize_py_build_dir = os.path.join(cwd, "llama.cpp","quantize.py")
+    quantize_py_dest_dir = os.path.join(
+        os_dest_dir,f"quantize.py")
+    print (f"[PREPARE] Copying quantize.py script to {quantize_dest_dir}.")
+    shutil.copy(quantize_py_build_dir, quantize_py_dest_dir)
 
 
 def build_llama_net():
     """
     Builds and runs the LLaMA.NET.Testing application
-
     """
     # Run the LLaMA.NET application
     os.system('dotnet build LLaMA.NET/LLaMA.NET.csproj')
