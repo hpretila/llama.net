@@ -6,13 +6,13 @@ using System.Runtime.InteropServices;
 
 namespace LLaMA.NET.LibLoader.Loaders
 {
-    public static class LinuxLoader
+    public static partial class LinuxLoader
     {
-        [DllImport("libdl.so")]
-        private static extern IntPtr dlopen(string filename, int flags);
+        [LibraryImport("libdl.so", StringMarshalling = StringMarshalling.Utf8)]
+        private static partial IntPtr dlopen(string filename, int flags);
 
-        [DllImport("libdl.so.2", EntryPoint = "dlopen")]
-        private static extern IntPtr dlopen2(string filename, int flags);
+        [LibraryImport("libdl.so.2", EntryPoint = "dlopen", StringMarshalling = StringMarshalling.Utf8)]
+        private static partial IntPtr dlopen2(string filename, int flags);
 
         public static void LibraryLoad(string libraryPath)
         {

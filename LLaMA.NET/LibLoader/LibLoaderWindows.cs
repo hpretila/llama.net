@@ -1,18 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace LLaMA.NET.LibLoader.Loaders
 {
-    public static class WindowsLoader
+    public static partial class WindowsLoader
     {
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr LoadLibrary(string lpFileName);
+        [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf8)]
+        private static partial IntPtr LoadLibrary(string lpFileName);
 
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
+        [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf8)]
+        private static partial IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
 
         public static void LibraryLoad(string libraryPath)
         {

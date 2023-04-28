@@ -1,91 +1,123 @@
 using System.Runtime.InteropServices;
-
 using LLaMA.NET.Native;
-using llama_token = System.Int32;
 
 namespace LLaMA.NET
 {
     public class LLaMARunner : IDisposable
     {
-        private LLaMAModel _model;
-        private string _prompt = "";
-        private int _N_THREADS = 8;
-        private llama_token[] _embeds = {};
+        private readonly LLaMAModel _model;
+        private readonly int _threads = 8;
+        private int[] _embeds = Array.Empty<int>();
 
-        public LLaMARunner(LLaMAModel model)
+        public LLaMARunner(LLaMAModel model, int threads = 4)
         {
-            this._model = model;
+            _model = model;
+            _threads = threads;
         }
 
-        public LLaMARunner WithPrompt(string prompt)
+        public void Instruction(string instruction, string input = "", string response = "")
         {
-            this._prompt = prompt;
+            var betterPrompt = $"Below is an instruction that describes a task";
+            if (string.IsNullOrEmpty(input))
+                betterPrompt += ".";
+            else
+                betterPrompt += ", paired with an input that provides further context.";
 
-            // Convert prompt to embeddings
-            var inputEmbeds = new llama_token[prompt.Length + 1];
+            betterPrompt += $"Write a response that appropriately completes the request.\n\n";
+            betterPrompt += "### Instruction:\n";
+            betterPrompt += $"{instruction}\n\n"; 
+            if(!string.IsNullOrEmpty(input))
+            {
+                betterPrompt += "### Input:\n";
+                betterPrompt += $"{input}\n\n";
+            }
+            betterPrompt += "### Response:\n\n";
+            betterPrompt += $"{response}";
+
+            IngestPrompt(betterPrompt);
+        }
+
+        public void Continuation(string beginning) => Instruction("Continue the following text", beginning, beginning);
+
+        public void IngestPrompt(string prompt)
+        {
+            Console.WriteLine(prompt);
+            var inputEmbeds = new int[prompt.Length + 1];
             var inputTokenLength = LLaMANativeMethods.llama_tokenize(_model.ctx.Value, prompt, inputEmbeds, inputEmbeds.Length, true);
             Array.Resize(ref inputEmbeds, inputTokenLength);
-            
-            // Evaluate the prompt
-            for (int i = 0; i < inputEmbeds.Length; i++)
-            {
-                // batch size 1
-                LLaMANativeMethods.llama_eval(_model.ctx.Value, new llama_token[] { inputEmbeds[i] }, 1, this._embeds.Length + i, _N_THREADS);
-            }
 
-            // Add it and pass it along 😋
-            this._embeds = this._embeds.Concat(inputEmbeds).ToArray();
-
-            return this;
+            _ = LLaMANativeMethods.llama_eval(_model.ctx.Value, inputEmbeds, inputEmbeds.Length, _embeds.Length, _threads);
+            _embeds = _embeds.Concat(inputEmbeds).ToArray();
         }
 
-        public LLaMARunner WithThreads(int nThreads)
+        public (int tokens, string text, bool isEos) Inference(int nTokensToPredict = 50)
         {
-            this._N_THREADS = nThreads;
-            return this;
-        }
-
-        public string Infer(out bool isEos, int nTokensToPredict = 50)
-        {
-            isEos = false;
+            var isEos = false;
             var prediction = "";
-
-            for (int i = 0; i < nTokensToPredict; i++)
+            int tokens;
+            for (tokens = 0; tokens < nTokensToPredict; tokens++)
             {
                 // Grab the next token
-                var id = LLaMANativeMethods.llama_sample_top_p_top_k(_model.ctx.Value, null, 0, 40, 0.8f, 0.2f, 1f / 0.85f);
+                var tokenId = LLaMANativeMethods.llama_sample_top_p_top_k(_model.ctx.Value, Array.Empty<int>(), 0, 40, 0.8f, 0.2f, 1f / 0.85f);
 
-                // Check if EOS, and break if otherwise!
-                if (id == LLaMANativeMethods.llama_token_eos())
+                if (tokenId == LLaMANativeMethods.llama_token_eos())
                 {
                     isEos = true;
                     break;
                 }
 
                 // Add it to the context (all tokens, prompt + predict)
-                var newEmbds = new llama_token[] { id };
-                this._embeds = this._embeds.Concat(newEmbds).ToArray();
+                var newEmbds = new int[] { tokenId };
+                _embeds = _embeds.Concat(newEmbds).ToArray();
 
                 // Get res!
-                var res = Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(_model.ctx.Value, id));
+                var res = Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(_model.ctx.Value, tokenId));
 
                 // Add to string
                 prediction += res;
 
                 // eval next token
-                LLaMANativeMethods.llama_eval(_model.ctx.Value, newEmbds, 1, this._embeds.Length, _N_THREADS);
+                _ = LLaMANativeMethods.llama_eval(_model.ctx.Value, newEmbds, 1, _embeds.Length, _threads);
             }
 
-            return prediction;
+            return (tokens, prediction, isEos);
         }
 
-        public void Clear()
+        public IEnumerable<string> InferenceStream(int nTokensToPredict = 50)
         {
-            this._embeds = new llama_token[] {};
+            var newLineCounter = 0;
+            var tokens = 0;
+            (int count, string text, bool eos) = (0, "", false);
+            for (int i = 0; i < nTokensToPredict; i++)
+            {
+                (count, text, eos) = Inference(1);
+                tokens += count;
+
+                if (eos)
+                    break;
+
+                if (text == Environment.NewLine)
+                {
+                    newLineCounter++;
+                    if (newLineCounter > 2)
+                        break;
+                }
+                else
+                    newLineCounter = 0;
+
+                yield return text;
+            }
+            yield return $"{Environment.NewLine}Tokens: {tokens} - Termination reason {(eos ? "EOS" : (tokens == nTokensToPredict ? "Token Limit" : (newLineCounter > 2 ? "New Line Limit" : "Unknown")))}";
         }
+
+
+        public void Clear() => _embeds = Array.Empty<int>();
 
         public void Dispose()
         {
+            Clear();
+            _model.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }

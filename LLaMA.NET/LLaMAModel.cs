@@ -10,13 +10,8 @@ namespace LLaMA.NET
     {
         public Lazy<IntPtr> ctx;
         private bool isDisposed = false;
-        private bool isFromFile = false;
-        private bool isFromBytes = false;
 
-        private LLaMAModel(IntPtr context)
-        {
-            this.ctx = new Lazy<IntPtr>(() => context);
-        }
+        private LLaMAModel(IntPtr context) => ctx = new Lazy<IntPtr>(() => context);
 
         /// <summary>
         /// Creates a new LLaMAModelFactory from a model path.
@@ -29,7 +24,10 @@ namespace LLaMA.NET
             return new LLaMAModel(
                 LLaMANativeMethods.llama_init_from_file(
                     modelPath, 
-                    LLaMANativeMethods.llama_context_default_params()
+                    new LLaMAContextParams{
+                        seed = 1,
+                        n_ctx = 1024
+                    }
                 )
             );
         }
@@ -38,13 +36,11 @@ namespace LLaMA.NET
         /// Creates a LLaMARunner for this model.
         /// </summary>
         /// <returns>A new LLaMARunner.</returns>
-        public LLaMARunner CreateRunner()
-        {
-            return new LLaMARunner(this);
-        }
+        public LLaMARunner CreateRunner(int threads = 4) => new (this, threads);
 
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             // If already disposed, do nothing.
             if (isDisposed)
             {
