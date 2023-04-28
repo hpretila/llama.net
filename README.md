@@ -1,4 +1,4 @@
-# LLaMA.NET
+# LLaMA.NET - Rewritten
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 .NET library to run [LLaMA](https://arxiv.org/abs/2302.13971) using [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp). 
@@ -7,8 +7,6 @@
 To build the library, you need to have [CMake](https://cmake.org/) and Python installed. Then, run the following commands at the root of the repository.
 
 ```bash
-# Pull the submodules
-git submodule update --init --recursive
 
 # Build and prepare the C++ library
 python scripts/build_llama_cpp.py
@@ -27,33 +25,90 @@ Currently only Linux is supported. Work is being done to dynamically load the C+
 
 ## Usage 📖
 
-### Model Preparation
-To use the library, you need to have a model. It needs to be converted to a binary format that can be loaded by the library. See [llama.cpp/README.md](llama.cpp/README.md) for more information on how to convert a model.
-
-The model directory should contain the following files:
-- `ggml-model-q4_0.bin`: The model file.
-- `params.json`: The model parameters.
-- `tokenizer.model`: The tokenizer model.
-
 ### Inference
 To run inference, you need to load a model and create a runner. The runner can then be used to run inference on a prompt.
 ```csharp
-using LLaMA.NET;
+public static class Program
+{
+    static Stopwatch sw = Stopwatch.StartNew();
+    static int tokens=0;
+    static double tokensPerSecond=0;
+    private static void Main()
+    {
+        var model = LLaMAModel.FromPath("/models/ggml-alpaca-7b-native-q4.bin");
+        var runner = model.CreateRunner(6);
 
-LLaMAModel model = LLaMAModel.FromPath("/path/to/your/ggml-model-q4_0.bin");
-LLaMARunner runner = model.CreateRunner()
-    .WithThreads(8);
+        tokens = 0;
+        runner.Instruction($"Write a C# script that displays the current date", "");
+        sw = Stopwatch.StartNew();
+        foreach(var token in runner.InferenceStream(150)) 
+        {
+            tokens++;
+            Console.Write(token);
+        }
+        Console.WriteLine();
+        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
+        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
 
-var res = runner.WithPrompt(" This is the story of a man named ")
-    .Infer(out _, nTokensToPredict = 50);
-Console.Write(res);
+        runner.Clear();
 
-model.Dispose();
+        tokens = 0;
+        runner.Instruction($"Extract favorite food, Age, Name, City", "Hello my name is Trbl and I am 30 years old. I live in vienna austria. I like pizza. I hate fish. Spaghetti is good too");
+        sw = Stopwatch.StartNew();
+        foreach(var token in runner.InferenceStream(150)) 
+        {
+            tokens++;
+            Console.Write(token);
+        }
+        Console.WriteLine();
+        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
+        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
+
+        runner.Clear();
+       
+        tokens = 0;
+        runner.Continuation($"A long time ago, in a galaxy far far away... ");
+        sw = Stopwatch.StartNew();
+        foreach(var token in runner.InferenceStream(150)) 
+        {
+            tokens++;
+            Console.Write(token);
+        }
+        Console.WriteLine();
+        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
+        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
+
+        runner.Clear();
+
+        tokens = 0;
+
+        var story = @"""We buried my brother with his dreams. On colored scraps of paper my young son, Teddy, and I scrawled all the fantasies Abe never achieved for lack of trying: hero, quarterback, singer, actor and more and crammed them in the satin folds of his coffin along with his favorite bottle of Jack and a pack of Camels. Teddy, a budding artist, sketched Abe throwing a football.
+            “Can you imagine Uncle Abe throwing long on a cloud?” Teddy asked as he gingerly dropped in the drawing.
+            “Might piss off the angels if he gets too rowdy,” I shrugged. “Same goes for showing off his bravery or acting like he’s better than all the other souls.”
+            “Everyone sings in heaven. He can sing, huh?” Teddy pressed.
+            “Not off-key. God has sensitive ears.”
+            “So, Uncle Abe doesn’t get to live his dreams after all? That sucks,” Teddy gathered his crayons and paper, sat on the floor of the funeral parlor and begin drawing in earnest.
+            “What the hell are you doing, Teddy?”
+            Teddy put a finishing flourish on a portrait of himself painting.
+            “Going for my dreams while I can just in case I run out of time and end up in heaven.”""";
+
+        runner.Instruction($"What is this story about?", story);
+        sw = Stopwatch.StartNew();
+        foreach(var token in runner.InferenceStream(150)) 
+        {
+            tokens++;
+            Console.Write(token);
+        }
+        Console.WriteLine();
+        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
+        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
+
 ```
 
 ## License 📜
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments 🙏
+- [hpretila/llama.net](https://github.com/hpretila/llama.net) The original author
 - [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp) for the LLaMA implementation in C++.
 - [sandrohanea/whisper.net](https://github.com/sandrohanea/whisper.net) as the reference on loading ggml models and libraries into .NET.
