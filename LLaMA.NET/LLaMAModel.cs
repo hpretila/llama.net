@@ -1,5 +1,5 @@
-using LLaMA.NET.Native;
 using LLaMA.NET.LibLoader;
+using LLaMA.NET.Native;
 
 namespace LLaMA.NET
 {
@@ -8,10 +8,15 @@ namespace LLaMA.NET
     /// </summary>
     public class LLaMAModel : IDisposable
     {
+        public string ModelName;
         public Lazy<IntPtr> ctx;
         private bool isDisposed = false;
 
-        private LLaMAModel(IntPtr context) => ctx = new Lazy<IntPtr>(() => context);
+        private LLaMAModel(string modelName, IntPtr context)
+        {
+            ctx = new Lazy<IntPtr>(() => context);
+            ModelName = modelName;
+        }
 
         /// <summary>
         /// Creates a new LLaMAModelFactory from a model path.
@@ -21,10 +26,11 @@ namespace LLaMA.NET
         {
             LibLoader.LibLoader.LibraryLoad();
 
-            return new LLaMAModel(
+            return new LLaMAModel(Path.GetFileName(modelPath),
                 LLaMANativeMethods.llama_init_from_file(
-                    modelPath, 
-                    new LLaMAContextParams{
+                    modelPath,
+                    new LLaMAContextParams
+                    {
                         seed = 1,
                         n_ctx = 1024
                     }
@@ -36,7 +42,7 @@ namespace LLaMA.NET
         /// Creates a LLaMARunner for this model.
         /// </summary>
         /// <returns>A new LLaMARunner.</returns>
-        public LLaMARunner CreateRunner(int threads = 4) => new (this, threads);
+        public LLaMARunner CreateRunner(int threads = 4) => new(this, threads);
 
         public void Dispose()
         {
