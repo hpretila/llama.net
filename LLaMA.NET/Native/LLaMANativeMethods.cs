@@ -9,15 +9,14 @@ namespace LLaMA.NET.Native
     [StructLayout(LayoutKind.Sequential)]
     public struct LLaMAContextParams
     {
-        internal int n_ctx;   // text context
-        internal int n_parts; // -1 for default
-        internal int seed;    // RNG seed, 0 for random
-
-        internal bool f16_kv;     // use fp16 for KV cache
-        internal bool logits_all; // the llama_eval() call computes all logits, not just the last one
-        internal bool vocab_only; // only load the vocabulary, no weights
-        internal bool use_mlock;  // force system to keep model in RAM
-        internal bool embedding;  // embedding mode only
+        public int n_ctx;   // text context
+        public int n_parts; // -1 for default
+        public int seed;    // RNG seed, 0 for random
+        public bool f16_kv;     // use fp16 for KV cache
+        public bool logits_all; // the llama_eval() call computes all logits, not just the last one
+        public bool vocab_only; // only load the vocabulary, no weights
+        public bool use_mlock;  // force system to keep model in RAM
+        public bool embedding;  // embedding mode only
     }
 
     /// <summary>
@@ -26,25 +25,25 @@ namespace LLaMA.NET.Native
     internal static partial class LLaMANativeMethods
     {
 
-        [DllImport("llama", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("llama", EntryPoint = "llama_context_default_params", CallingConvention = CallingConvention.Cdecl)]
         internal static extern LLaMAContextParams llama_context_default_params();
 
         [DllImport("llama", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         internal static extern IntPtr llama_init_from_file(string path_model, LLaMAContextParams parameters);
 
-        [LibraryImport("llama")]
+        [LibraryImport("llama", EntryPoint = "llama_free")]
         [UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         internal static partial void llama_free(IntPtr context);
 
-        [LibraryImport("llama", StringMarshalling = StringMarshalling.Utf8)]
+        [LibraryImport("llama", EntryPoint= "llama_model_quantize", StringMarshalling = StringMarshalling.Utf8)]
         [UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         internal static partial int llama_model_quantize(string fname_inp, string fname_out, int itype, int qk);
 
-        [LibraryImport("llama")]
+        [LibraryImport("llama", EntryPoint = "llama_eval")]
         [UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         internal static partial int llama_eval(IntPtr context, int[] tokens, int n_tokens, int n_past, int n_threads);
 
-        [LibraryImport("llama", StringMarshalling = StringMarshalling.Utf8)]
+        [LibraryImport("llama", EntryPoint = "llama_tokenize", StringMarshalling = StringMarshalling.Utf8)]
         [UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         internal static partial int llama_tokenize(IntPtr context, string text, int[] tokens, int n_max_tokens, [MarshalAs(UnmanagedType.Bool)] bool add_bos);
 

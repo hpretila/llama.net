@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using LLaMA.NET.Native;
 
@@ -9,125 +8,81 @@ namespace LLaMA.NET
         private readonly LLaMAModel _model;
         private readonly int _threads = 8;
         private int[] _embeds = Array.Empty<int>();
-
-        private int activeJobs = 0;
+        private int[] firstPrompt = Array.Empty<int>();
+        private int[] lastPrompt = Array.Empty<int>();
         public bool Busy = false;
 
-        public LLaMARunner(LLaMAModel model, int threads = 4)
+        public LLaMARunner(LLaMAModel model, int threads = 6)
         {
             _model = model;
             _threads = threads;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IEnumerable<string> Instruction(string instruction, string input = "", string response = "", CancellationToken ctx = default)
-        {
-            // Interlocked.Increment(ref activeJobs);
-            // var betterPrompt = $"Below is an instruction that describes a task";
-            // if (string.IsNullOrEmpty(input))
-            //     betterPrompt += ".";
-            // else
-            //     betterPrompt += ", paired with an input that provides further context.";
-
-            // betterPrompt += $"Write a response that appropriately completes the request.\n\n";
-            var betterPrompt = "### Instruction:\n";
-            betterPrompt += $"{instruction}\n\n"; 
-            if(!string.IsNullOrEmpty(input))
-            {
-                betterPrompt += "### Input:\n";
-                betterPrompt += $"{input}\n\n";
-            }
-            betterPrompt += "### Response:\n";
-            betterPrompt += $"{response}";
-
-            return IngestPrompt(betterPrompt, ctx);
+            Console.WriteLine(Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_print_system_info()));
         }
 
         public IEnumerable<string> IngestPrompt(string prompt, CancellationToken ctx = default)
         {
-            var inputEmbeds = new int[prompt.Length + 1];
-            var inputTokenLength = LLaMANativeMethods.llama_tokenize(_model.ctx.Value, prompt, inputEmbeds, inputEmbeds.Length, true);
+            var inputEmbeds = new int[prompt.Length];
+            var inputTokenLength = LLaMANativeMethods.llama_tokenize(_model.ctx, prompt, inputEmbeds, inputEmbeds.Length, false);
             Array.Resize(ref inputEmbeds, inputTokenLength);
 
             // Evaluate the prompt batchsize 1
             for (int i = 0; i < inputEmbeds.Length; i++)
-            {
-                if(ctx.IsCancellationRequested)
-                    break;
-                
-                LLaMANativeMethods.llama_eval(_model.ctx.Value, new int[] { inputEmbeds[i] }, 1, _embeds.Length + i, _threads);
-                var token = LLaMANativeMethods.llama_token_to_str(_model.ctx.Value, inputEmbeds[i]);
+            {   
+                var token = LLaMANativeMethods.llama_token_to_str(_model.ctx, inputEmbeds[i]);
                 var tokenStr = Marshal.PtrToStringAnsi(token) ?? string.Empty;
                 yield return tokenStr;
             }
+            
+            LLaMANativeMethods.llama_eval(_model.ctx, inputEmbeds, inputEmbeds.Length, _embeds.Length, _threads);
+
             _embeds = _embeds.Concat(inputEmbeds).ToArray();
+            if (firstPrompt.Length == 0)
+                firstPrompt = inputEmbeds.ToArray();
+            lastPrompt = inputEmbeds.ToArray();
         }
 
-        public (int tokens, string text, bool isEos) Inference(int nTokensToPredict = 50, int top_k = 40, float top_p = 0.8f, float temperature = 0.85f, float repetition_penalty = 1f, CancellationToken ctx = default)
+        public IEnumerable<string> InferenceStream(int nTokensToPredict, string[] reversePrompts, bool ignoreEos = false, int top_k = 40, float top_p = 0.8f, float temperature = 0.85f, float repetition_penalty = 1f, CancellationToken ctx = default)
         {
-            var isEos = false;
-            var prediction = "";
-            int tokens;
-            for (tokens = 0; tokens < nTokensToPredict; tokens++)
-            {
-                // Grab the next token
-                var tokenId = LLaMANativeMethods.llama_sample_top_p_top_k(_model.ctx.Value, Array.Empty<int>(), 0, top_k, top_p, temperature, repetition_penalty);
-                var res = Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(_model.ctx.Value, tokenId));
-
-                if(res == "#" || res == "##")
-                {
-                    isEos =true;
-                    break;
-                }
-                
-                if (tokenId == LLaMANativeMethods.llama_token_eos())
-                {
-                    isEos = true;
-                    break;
-                }
-
-                // Add it to the context (all tokens, prompt + predict)
-                var newEmbds = new int[] { tokenId };
-                _embeds = _embeds.Concat(newEmbds).ToArray();
-                // Add to string
-                prediction += res;
-
-                // eval next token
-                _ = LLaMANativeMethods.llama_eval(_model.ctx.Value, newEmbds, 1, _embeds.Length, _threads);
-            }
-
-            Interlocked.Decrement(ref activeJobs);
-            return (tokens, prediction, isEos);
-        }
-
-        public IEnumerable<string> InferenceStream(int nTokensToPredict = 50, int top_k = 40, float top_p = 0.8f, float temperature = 0.85f, float repetition_penalty = 1f, CancellationToken ctx = default)
-        {
-            var newLineCounter = 0;
-            var tokens = 0;
-            (int count, string text, bool eos) = (default, string.Empty, default);
+            var msg = string.Empty;
             for (int i = 0; i < nTokensToPredict; i++)
             {
-                if(ctx.IsCancellationRequested)
-                    break;
-                (count, text, eos) = Inference(1,  top_k, top_p, temperature, repetition_penalty, ctx);;
-                tokens++;
-
-                if (eos)
-                    break;
-
-                if (text == Environment.NewLine)
+                if (ctx.IsCancellationRequested)
                 {
-                    newLineCounter++;
-                    if (newLineCounter > 3)
-                        break;
+                    _embeds = _embeds[..^(i + lastPrompt.Length)];
+                    break;
                 }
-                else
-                    newLineCounter = 0;
 
-                yield return text;
+                if (_embeds.Length == _model.ContextParams.n_ctx - 1)
+                {
+                    _embeds = _embeds[(_embeds.Length / 2)..];
+                    LLaMANativeMethods.llama_eval(_model.ctx, _embeds, _embeds.Length, 1, _threads);
+                }
+
+                var tokenId = LLaMANativeMethods.llama_sample_top_p_top_k(_model.ctx, _embeds, _embeds.Length, top_k, top_p, temperature, repetition_penalty);
+                var res = Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(_model.ctx, tokenId)) ?? string.Empty;
+                msg += res;
+                int[] newEmbds = { tokenId };
+                _embeds = _embeds.Concat(newEmbds).ToArray();
+                LLaMANativeMethods.llama_eval(_model.ctx, newEmbds, 1, _embeds.Length, _threads);
+
+                // for (int y = 0; y < reversePrompts.Length; y++)
+                // {
+                //     var last = _embeds.TakeLast(3).ToArray();
+                //     var str = Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(_model.ctx, last[0]));
+                //     str += Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(_model.ctx, last[1]));
+                //     str += Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(_model.ctx, last[2]));
+                //     // str = str.Trim();
+                //     if(str.Contains('\n'))
+                //         yield return "\n";
+                //     if (string.Equals(str, reversePrompts[y], StringComparison.InvariantCultureIgnoreCase) || str.Contains('\n'))
+                //         yield break;
+                // }
+
+                if (tokenId == LLaMANativeMethods.llama_token_eos() && !ignoreEos)
+                    break;
+
+                yield return res;
             }
-            Interlocked.Decrement(ref activeJobs);
-            yield return $"{Environment.NewLine}Tokens: {tokens}, Termination reason {(eos ? "EOS" : (tokens == nTokensToPredict ? "Token Limit" : (newLineCounter > 3 ? "New Line Limit" : "Unknown")))}";
         }
 
 

@@ -6,36 +6,20 @@ namespace LLaMA.NET
     /// <summary>
     /// A factory for LLaMA models. Processed with <seealso cref="WhisperProcessor"/>
     /// </summary>
-    public class LLaMAModel : IDisposable
+    public unsafe class LLaMAModel : IDisposable
     {
         public string ModelName;
-        public Lazy<IntPtr> ctx;
+        public IntPtr ctx;
         private bool isDisposed = false;
+        public readonly LLaMAContextParams ContextParams;
 
-        private LLaMAModel(string modelName, IntPtr context)
-        {
-            ctx = new Lazy<IntPtr>(() => context);
-            ModelName = modelName;
-        }
-
-        /// <summary>
-        /// Creates a new LLaMAModelFactory from a model path.
-        /// </summary>
-        /// <param name="modelPath">The path to the model.</param>
-        public static LLaMAModel FromPath(string modelPath)
-        {
-            LibLoader.LibLoader.LibraryLoad();
-
-            return new LLaMAModel(Path.GetFileName(modelPath),
-                LLaMANativeMethods.llama_init_from_file(
-                    modelPath,
-                    new LLaMAContextParams
-                    {
-                        seed = 1,
-                        n_ctx = 1024
-                    }
-                )
-            );
+        static LLaMAModel() => LibLoader.LibLoader.LibraryLoad();
+        public LLaMAModel(string modelPath)
+        {   
+            ContextParams = LLaMANativeMethods.llama_context_default_params();
+            ContextParams.n_ctx = 64;
+            ctx = (IntPtr)LLaMANativeMethods.llama_init_from_file(modelPath, ContextParams).ToPointer();
+            ModelName = Path.GetFileName(modelPath);
         }
 
         /// <summary>
@@ -46,18 +30,13 @@ namespace LLaMA.NET
 
         public void Dispose()
         {
-            GC.SuppressFinalize(this);
-            // If already disposed, do nothing.
             if (isDisposed)
-            {
                 return;
-            }
 
-            // Dispose of unmanaged resources.
-            if (ctx.IsValueCreated && ctx.Value != IntPtr.Zero)
-            {
-                LLaMANativeMethods.llama_free(ctx.Value);
-            }
+            GC.SuppressFinalize(this);
+         
+            if (ctx != IntPtr.Zero)
+                LLaMANativeMethods.llama_free(ctx);
 
             isDisposed = true;
         }
