@@ -25,62 +25,32 @@ Currently only Linux is supported. Work is being done to dynamically load the C+
 
 ## Usage 📖
 
-### Inference
-To run inference, you need to load a model and create a runner. The runner can then be used to run inference on a prompt.
 ```csharp
 public static class Program
 {
     static Stopwatch sw = Stopwatch.StartNew();
-    static int tokens=0;
-    static double tokensPerSecond=0;
     private static void Main()
     {
-        var model = LLaMAModel.FromPath("/models/ggml-alpaca-7b-native-q4.bin");
-        var runner = model.CreateRunner(6);
+        var runner = new LLM("/models/ggml-alpaca-7b-native-q4.bin");
 
-        tokens = 0;
         runner.Instruction($"Write a C# script that displays the current date", "");
-        sw = Stopwatch.StartNew();
         foreach(var token in runner.InferenceStream(150)) 
-        {
-            tokens++;
             Console.Write(token);
-        }
         Console.WriteLine();
-        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
-        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
 
-        runner.Clear();
+        runner.ClearContext();
 
-        tokens = 0;
         runner.Instruction($"Extract favorite food, Age, Name, City", "Hello my name is Trbl and I am 30 years old. I live in vienna austria. I like pizza. I hate fish. Spaghetti is good too");
-        sw = Stopwatch.StartNew();
-        foreach(var token in runner.InferenceStream(150)) 
-        {
-            tokens++;
+        foreach(var token in runner.InferenceStream(150))
             Console.Write(token);
-        }
-        Console.WriteLine();
-        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
-        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
 
-        runner.Clear();
+        runner.ClearContext();
        
-        tokens = 0;
         runner.Continuation($"A long time ago, in a galaxy far far away... ");
-        sw = Stopwatch.StartNew();
         foreach(var token in runner.InferenceStream(150)) 
-        {
-            tokens++;
             Console.Write(token);
-        }
-        Console.WriteLine();
-        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
-        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
 
-        runner.Clear();
-
-        tokens = 0;
+        runner.ClearContext();
 
         var story = @"""We buried my brother with his dreams. On colored scraps of paper my young son, Teddy, and I scrawled all the fantasies Abe never achieved for lack of trying: hero, quarterback, singer, actor and more and crammed them in the satin folds of his coffin along with his favorite bottle of Jack and a pack of Camels. Teddy, a budding artist, sketched Abe throwing a football.
             “Can you imagine Uncle Abe throwing long on a cloud?” Teddy asked as he gingerly dropped in the drawing.
@@ -93,16 +63,8 @@ public static class Program
             “Going for my dreams while I can just in case I run out of time and end up in heaven.”""";
 
         runner.Instruction($"What is this story about?", story);
-        sw = Stopwatch.StartNew();
-        foreach(var token in runner.InferenceStream(150)) 
-        {
-            tokens++;
+        foreach(var token in runner.InferenceStream(150))
             Console.Write(token);
-        }
-        Console.WriteLine();
-        tokensPerSecond = tokens / sw.Elapsed.TotalSeconds;
-        Console.WriteLine($"Time: {sw.ElapsedMilliseconds:0.00}ms (tokens per second: {tokensPerSecond:0.00})");
-
 ```
 
 ## License 📜
