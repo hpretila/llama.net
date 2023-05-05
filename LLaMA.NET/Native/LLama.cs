@@ -33,12 +33,6 @@ namespace LLaMA.NET.Native
 
         [LibraryImport("llama")]
         internal static partial nint llama_token_to_str(nint context, int token);
-
-        [LibraryImport("llama")]
-        internal static partial int llama_token_bos();
-
-        [LibraryImport("llama")]
-        internal static partial int llama_token_eos();
         [DllImport("llama")]
         public static extern void llama_sample_repetition_penalty(nint ctx, ref llama_token_data_array candidates, int[] last_tokens, int last_tokens_size, float penalty);
 
@@ -99,5 +93,15 @@ namespace LLaMA.NET.Native
 
         [LibraryImport("llama")]
         public static partial nint llama_copy_state_data(nint ctx, nint dest, nint dest_size);
+
+        
+        [LibraryImport("llama")]
+        internal static partial int llama_token_nl();
+
+        [LibraryImport("llama")]
+        internal static partial int llama_token_bos();
+
+        [LibraryImport("llama")]
+        internal static partial int llama_token_eos();
     }
 }

@@ -18,14 +18,6 @@ namespace LLaMA.NET.Native
             }
         }
 
-        public llama_token_data[] ToArray()
-        {
-            llama_token_data[] array = new llama_token_data[(int)length];
-            for (int i = 0; i < array.Length; i++)
-                array[i] = (llama_token_data)Marshal.PtrToStructure(IntPtr.Add(ptr, i * Marshal.SizeOf(typeof(llama_token_data))), typeof(llama_token_data));
-            return array;
-        }
-
         public void Free()
         {
             Marshal.FreeHGlobal(ptr);

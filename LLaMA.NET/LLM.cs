@@ -23,10 +23,14 @@ namespace LLaMA.NET
             _threads = threads;
             ContextParams.n_ctx = 2048;
             ContextParams.seed = 1;
+            ContextParams.f16_kv = true;
+            ContextParams.embedding = false;
+            ContextParams.logits_all = false;
+            ContextParams.progress_callback += (float progress, nint ctx) => Console.WriteLine($"Progress_Callback: Never Fires {progress}");
             ContextParams.use_mmap = true;
             ModelName = Path.GetFileName(modelPath);
             Context = LLama.llama_init_from_file(modelPath, ContextParams);
-            LLama.llama_set_rng_seed(Context, 1);
+            // LLama.llama_set_rng_seed(Context, 1); // not needed?
             Console.WriteLine(Marshal.PtrToStringAnsi(LLama.llama_print_system_info()));
         }
 
@@ -43,9 +47,12 @@ namespace LLaMA.NET
 
             Array.Resize(ref inputTokens, tokens);
 
-            Lobotomize();
+            // Lobotomize();
 
-            LLama.llama_eval(Context, inputTokens, inputTokens.Length, _embeds.Length, _threads);
+            // LLama.llama_eval(Context, inputTokens, inputTokens.Length, _embeds.Length, _threads);
+
+            for(int i = 0; i < inputTokens.Length; i++)
+                LLama.llama_eval(Context, new[]{ inputTokens[i]} , 1, _embeds.Length + i, _threads);
 
             _embeds = _embeds.Concat(inputTokens).ToArray();
             if (firstPrompt.Length == 0)
@@ -60,13 +67,15 @@ namespace LLaMA.NET
             bool ignoreEos = false,
             int top_k = 40,
             float top_p = 0.8f,
-            float temperature = 0.85f,
-            float repetition_penalty = 1f,
-            int mirostat = 2,
-            float surprise = 0.2f,
-            float learningRate = 0.1f,
-            float tfs_z = 1.5f,
-            float typical_p = 0.5f,
+            float temp = 0.25f, // 0 = greedy
+            float repetition_penalty = 1f, // 1=disabled
+            int mirostat = 1,
+            float tauSurpriseOrEntropy = 3f,
+            float etaLearningRate = 0.01f,
+            float tailFreeSampling = 1f, // broken 1=disabled   
+            float typical_p = 1f, // broken 1=disabled
+            bool penalize_nl = false,
+            bool penalize_space = false,
             CancellationToken ctx = default
         )
         {
@@ -81,34 +90,33 @@ namespace LLaMA.NET
 
                 Lobotomize();
 
-                var candidates = GetCandidates();
-                LLama.llama_sample_repetition_penalty(Context, ref candidates, _embeds, _embeds.Length, repetition_penalty);
-                LLama.llama_sample_frequency_and_presence_penalties(Context, ref candidates, _embeds, _embeds.Length, 1, 1);
+                var candidates_p = GetCandidates(repetition_penalty, penalize_nl, penalizeSpaces: false);
+                LLama.llama_sample_repetition_penalty(Context, ref candidates_p, _embeds, _embeds.Length, repetition_penalty);
+                LLama.llama_sample_frequency_and_presence_penalties(Context, ref candidates_p, _embeds, _embeds.Length, 0, 0);
 
                 int tokenId=0;
-                if (temperature <= 0)
-                {
-                    tokenId = LLama.llama_sample_token_greedy(Context, ref candidates).ToInt32();
-                }
-                else
+                if (temp > 0)
                 {
                     if (mirostat == 1)
-                        tokenId = MirostatV1(surprise, learningRate, ref candidates).ToInt32();
-                    if (mirostat == 2)
-                        tokenId = MirostatV2(temperature, surprise, learningRate, ref candidates).ToInt32();
+                        tokenId = MirostatV1(tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
+                    else if (mirostat == 2)
+                        tokenId = MirostatV2(temp, tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
                     else
                     {
-                        LLama.llama_sample_top_k(Context, ref candidates, top_k, 12);
-                        LLama.llama_sample_tail_free(Context, ref candidates, tfs_z, 9);
-                        LLama.llama_sample_typical(Context, ref candidates, typical_p, 6);
-                        LLama.llama_sample_top_p(Context, ref candidates, top_p, 3);
-                        LLama.llama_sample_temperature(Context, ref candidates, temperature);
-                        tokenId = LLama.llama_sample_token(Context, ref candidates).ToInt32();
+                        LLama.llama_sample_top_k(Context, ref candidates_p, top_k, 10);
+                        LLama.llama_sample_tail_free(Context, ref candidates_p, tailFreeSampling, 10);
+                        LLama.llama_sample_typical(Context, ref candidates_p, typical_p, 10);
+                        LLama.llama_sample_top_p(Context, ref candidates_p, top_p, 10);
+                        LLama.llama_sample_temperature(Context, ref candidates_p, temp);
+                        tokenId = LLama.llama_sample_token(Context, ref candidates_p).ToInt32();
                     }
                 }
-                candidates.Free();
+                else
+                    tokenId = LLama.llama_sample_token_greedy(Context, ref candidates_p).ToInt32();
+                
+                candidates_p.Free();
 
-                var res = Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, tokenId)) ?? string.Empty;
+                var res = Marshal.PtrToStringUTF8(LLama.llama_token_to_str(Context, tokenId)) ?? string.Empty;
                 msg += res;
                 int[] newEmbds = { tokenId };
                 _embeds = _embeds.Concat(newEmbds).ToArray();
@@ -162,18 +170,24 @@ namespace LLaMA.NET
             LLama.llama_eval(Context, _embeds, _embeds.Length, 1, _threads);
         }
 
-        private llama_token_data_array GetCandidates()
+        private llama_token_data_array GetCandidates(float repetition_penalty, bool penalizeNewLines = false, bool penalizeSpaces = false)
         {
             var logits = LLama.llama_get_logits(Context);
             var vocab = LLama.llama_n_vocab(Context);
+            float newLineLogit = logits[LLama.llama_token_nl()];
+            float spaceLogit = logits[LLama.llama_token_bos()];
 
             var candidates = new List<llama_token_data>();
             for (int token_id = 0; token_id < vocab; token_id++)
                 candidates.Add(new llama_token_data(token_id, logits[token_id], 0.0f));
 
             var candidates_p = new llama_token_data_array(candidates.ToArray());
+            
+            if (!penalizeNewLines)
+                logits[LLama.llama_token_nl()] = newLineLogit;
+            if (!penalizeSpaces)
+                logits[LLama.llama_token_bos()] = spaceLogit;
 
-            // LLama.llama_sample_typical(Context, ref candidates_p, 1.0f);
             return candidates_p;
         }
 
