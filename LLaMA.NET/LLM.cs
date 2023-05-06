@@ -44,21 +44,35 @@ namespace LLaMA.NET
                 yield return $"Prompt is too long. Max length is {ContextParams.n_ctx} tokens.";
                 yield break;
             }
-
             Array.Resize(ref inputTokens, tokens);
 
-            Lobotomize();
+            // int batchSize = 1; // Set the batch size
+            // for (int i = 0; i < inputTokens.Length; i += batchSize)
+            // {
+            //     LLama.llama_eval(Context, new[] { inputTokens[i] }, 1, _embeds.Length + i, _threads);
+            //     yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, inputTokens[i]));
+            // }
+            // _embeds = _embeds.Concat(inputTokens).ToArray();
 
-            // LLama.llama_eval(Context, inputTokens, inputTokens.Length, _embeds.Length, _threads);
-
-            int batchSize = 1; // Set the batch size
+            int batchSize = 32; // Set the batch size
             for (int i = 0; i < inputTokens.Length; i += batchSize)
             {
-                LLama.llama_eval(Context, new[] { inputTokens[i] }, 1, _embeds.Length + i, _threads);
-                yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, inputTokens[i]));
-            }
+                int count = Math.Min(batchSize, inputTokens.Length - i); // Calculate the number of tokens in the current batch
+                var batch = new int[count];
+                for (int j = 0; j < count; j++)
+                    batch[j] = inputTokens[i + j]; // Copy the token data from inputTokens to batch
 
-            _embeds = _embeds.Concat(inputTokens).ToArray();
+                LLama.llama_eval(Context, batch, count, _embeds.Length + i, _threads);
+
+                for (int j = 0; j < batch.Length; j++)
+                    yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, batch[j]));
+
+                _embeds = _embeds.Concat(batch).ToArray();
+
+
+                while (_embeds.Length + tokens > ContextParams.n_ctx - 1)
+                    Lobotomize();
+            }
 
             if (firstPrompt.Length == 0)
                 firstPrompt = inputTokens.ToArray();
@@ -93,7 +107,8 @@ namespace LLaMA.NET
                     break;
                 }
 
-                Lobotomize();
+                while (_embeds.Length > ContextParams.n_ctx - 1)
+                    Lobotomize();
 
                 var candidates_p = GetCandidates(repetition_penalty, penalize_nl, penalizeSpaces: false);
                 LLama.llama_sample_repetition_penalty(Context, ref candidates_p, _embeds, _embeds.Length, repetition_penalty);
@@ -165,10 +180,7 @@ namespace LLaMA.NET
 
         private void Lobotomize()
         {
-            if (_embeds.Length < ContextParams.n_ctx - 1)
-                return;
-
-            var newEmbeds = firstPrompt.Concat(_embeds.Skip(firstPrompt.Length).Skip(_embeds.Length/2)).ToArray();
+            var newEmbeds = firstPrompt.Concat(_embeds.Skip(firstPrompt.Length).Skip(_embeds.Length / 2)).ToArray();
             _embeds = newEmbeds;
             LLama.llama_eval(Context, _embeds, _embeds.Length, 1, _threads);
         }
