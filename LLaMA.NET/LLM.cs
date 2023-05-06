@@ -109,32 +109,8 @@ namespace LLaMA.NET
 
                 while (_embeds.Length > ContextParams.n_ctx - 1)
                     Lobotomize();
-
-                var candidates_p = GetCandidates(repetition_penalty, penalize_nl, penalizeSpaces: false);
-                LLama.llama_sample_repetition_penalty(Context, ref candidates_p, _embeds, _embeds.Length, repetition_penalty);
-                LLama.llama_sample_frequency_and_presence_penalties(Context, ref candidates_p, _embeds, _embeds.Length, 0, 0);
-
-                int tokenId;
-                if (temp > 0)
-                {
-                    if (mirostat == 1)
-                        tokenId = MirostatV1(tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
-                    else if (mirostat == 2)
-                        tokenId = MirostatV2(temp, tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
-                    else
-                    {
-                        LLama.llama_sample_top_k(Context, ref candidates_p, top_k, 10);
-                        LLama.llama_sample_tail_free(Context, ref candidates_p, tailFreeSampling, 10);
-                        LLama.llama_sample_typical(Context, ref candidates_p, typical_p, 10);
-                        LLama.llama_sample_top_p(Context, ref candidates_p, top_p, 10);
-                        LLama.llama_sample_temperature(Context, ref candidates_p, temp);
-                        tokenId = LLama.llama_sample_token(Context, ref candidates_p).ToInt32();
-                    }
-                }
-                else
-                    tokenId = LLama.llama_sample_token_greedy(Context, ref candidates_p).ToInt32();
-
-                candidates_p.Free();
+                    
+                int tokenId = SampleToken(top_k, top_p, temp, repetition_penalty, mirostat, tauSurpriseOrEntropy, etaLearningRate, tailFreeSampling, typical_p, penalize_nl);
 
                 var res = Marshal.PtrToStringUTF8(LLama.llama_token_to_str(Context, tokenId)) ?? string.Empty;
                 msg += res;
@@ -161,6 +137,36 @@ namespace LLaMA.NET
                 yield return res;
             }
             Busy = false;
+        }
+
+        private int SampleToken(int top_k, float top_p, float temp, float repetition_penalty, int mirostat, float tauSurpriseOrEntropy, float etaLearningRate, float tailFreeSampling, float typical_p, bool penalize_nl)
+        {
+            var candidates_p = GetCandidates(repetition_penalty, penalize_nl, penalizeSpaces: false);
+            LLama.llama_sample_repetition_penalty(Context, ref candidates_p, _embeds, _embeds.Length, repetition_penalty);
+            LLama.llama_sample_frequency_and_presence_penalties(Context, ref candidates_p, _embeds, _embeds.Length, 0, 0);
+
+            int tokenId;
+            if (temp > 0)
+            {
+                if (mirostat == 1)
+                    tokenId = MirostatV1(tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
+                else if (mirostat == 2)
+                    tokenId = MirostatV2(temp, tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
+                else
+                {
+                    LLama.llama_sample_top_k(Context, ref candidates_p, top_k, 10);
+                    LLama.llama_sample_tail_free(Context, ref candidates_p, tailFreeSampling, 10);
+                    LLama.llama_sample_typical(Context, ref candidates_p, typical_p, 10);
+                    LLama.llama_sample_top_p(Context, ref candidates_p, top_p, 10);
+                    LLama.llama_sample_temperature(Context, ref candidates_p, temp);
+                    tokenId = LLama.llama_sample_token(Context, ref candidates_p).ToInt32();
+                }
+            }
+            else
+                tokenId = LLama.llama_sample_token_greedy(Context, ref candidates_p).ToInt32();
+
+            candidates_p.Free();
+            return tokenId;
         }
 
         private nint MirostatV2(float temperature, float tau, float eta, ref llama_token_data_array candidates)
