@@ -33,41 +33,41 @@ namespace LLaMA.NET.Native
 
         [LibraryImport("llama")]
         internal static partial nint llama_token_to_str(nint context, int token);
-        [DllImport("llama")]
-        public static extern void llama_sample_repetition_penalty(nint ctx, ref llama_token_data_array candidates, int[] last_tokens, int last_tokens_size, float penalty);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_repetition_penalty(nint ctx, ref LlamaTokenDataArray candidates, int[] last_tokens, int last_tokens_size, float penalty);
 
-        [DllImport("llama")]
-        public static extern void llama_sample_frequency_and_presence_penalties(nint ctx, ref llama_token_data_array candidates, int[] last_tokens, int last_tokens_size, float alpha_frequency, float alpha_presence);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_frequency_and_presence_penalties(nint ctx, ref LlamaTokenDataArray candidates, int[] last_tokens, int last_tokens_size, float alpha_frequency, float alpha_presence);
 
-        [DllImport("llama")]
-        public static extern void llama_sample_softmax(nint ctx, ref llama_token_data_array candidates);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_softmax(nint ctx, ref LlamaTokenDataArray candidates);
 
-        [DllImport("llama")]
-        public static extern void llama_sample_top_k(nint ctx, ref llama_token_data_array candidates, int k, nint min_keep = default);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_top_k(nint ctx, ref LlamaTokenDataArray candidates, int k, nint min_keep = default);
 
-        [DllImport("llama")]
-        public static extern void llama_sample_top_p(nint ctx, ref llama_token_data_array candidates, float p, nint min_keep = default);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_top_p(nint ctx, ref LlamaTokenDataArray candidates, float p, nint min_keep = default);
 
-        [DllImport("llama")]
-        public static extern void llama_sample_tail_free(nint ctx, ref llama_token_data_array candidates, float z, nint min_keep = default);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_tail_free(nint ctx, ref LlamaTokenDataArray candidates, float z, nint min_keep = default);
 
-        [DllImport("llama")]
-        public static extern void llama_sample_typical(nint ctx, ref llama_token_data_array candidates, float p, nint min_keep = default);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_typical(nint ctx, ref LlamaTokenDataArray candidates, float p, nint min_keep = default);
 
-        [DllImport("llama")]
-        public static extern void llama_sample_temperature(nint ctx, ref llama_token_data_array candidates, float temp);
+        [LibraryImport("llama")]
+        public static partial void llama_sample_temperature(nint ctx, ref LlamaTokenDataArray candidates, float temp);
 
-        [DllImport("llama")]
-        public static extern nint llama_sample_token_mirostat(nint ctx, ref llama_token_data_array candidates, float tau, float eta, int m, float* mu);
+        [LibraryImport("llama")]
+        public static partial nint llama_sample_token_mirostat(nint ctx, ref LlamaTokenDataArray candidates, float tau, float eta, int m, float* mu);
 
-        [DllImport("llama")]
-        public static extern nint llama_sample_token_mirostat_v2(nint ctx, ref llama_token_data_array candidates, float tau, float eta, float* mu);
+        [LibraryImport("llama")]
+        public static partial nint llama_sample_token_mirostat_v2(nint ctx, ref LlamaTokenDataArray candidates, float tau, float eta, float* mu);
 
-        [DllImport("llama")]
-        public static extern nint llama_sample_token_greedy(nint ctx, ref llama_token_data_array candidates);
+        [LibraryImport("llama")]
+        public static partial nint llama_sample_token_greedy(nint ctx, ref LlamaTokenDataArray candidates);
 
-        [DllImport("llama")]
-        public static extern nint llama_sample_token(nint ctx, ref llama_token_data_array candidates);
+        [LibraryImport("llama")]
+        public static partial nint llama_sample_token(nint ctx, ref LlamaTokenDataArray candidates);
 
         [LibraryImport("llama")]
         internal static partial nint llama_print_system_info();

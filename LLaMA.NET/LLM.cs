@@ -21,7 +21,7 @@ namespace LLaMA.NET
         public LLM(string modelPath, int threads = 2)
         {
             _threads = threads;
-            ContextParams.n_ctx = 128;
+            ContextParams.n_ctx = 2048;
             ContextParams.seed = 1;
             ContextParams.f16_kv = true;
             ContextParams.embedding = false;
@@ -50,11 +50,10 @@ namespace LLaMA.NET
             // for (int i = 0; i < inputTokens.Length; i += batchSize)
             // {
             //     LLama.llama_eval(Context, new[] { inputTokens[i] }, 1, _embeds.Length + i, _threads);
-            //     yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, inputTokens[i]));
+            //     yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, inputTokens[i])) ?? string.Empty;
             // }
-            // _embeds = _embeds.Concat(inputTokens).ToArray();
 
-            int batchSize = 32; // Set the batch size
+            int batchSize = 256; // Set the batch size
             for (int i = 0; i < inputTokens.Length; i += batchSize)
             {
                 int count = Math.Min(batchSize, inputTokens.Length - i); // Calculate the number of tokens in the current batch
@@ -62,17 +61,15 @@ namespace LLaMA.NET
                 for (int j = 0; j < count; j++)
                     batch[j] = inputTokens[i + j]; // Copy the token data from inputTokens to batch
 
-                LLama.llama_eval(Context, batch, count, _embeds.Length + i, _threads);
+                LLama.llama_eval(Context, batch, count, Math.Min(ContextParams.n_ctx, _embeds.Length+i), _threads);
 
                 for (int j = 0; j < batch.Length; j++)
                     yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, batch[j]));
-
-                _embeds = _embeds.Concat(batch).ToArray();
-
-
-                while (_embeds.Length + tokens > ContextParams.n_ctx - 1)
-                    Lobotomize();
             }
+
+            _embeds = _embeds.Concat(inputTokens).ToArray();
+            // while (_embeds.Length > ContextParams.n_ctx - 1)
+            //     Lobotomize();
 
             if (firstPrompt.Length == 0)
                 firstPrompt = inputTokens.ToArray();
@@ -82,7 +79,7 @@ namespace LLaMA.NET
         public IEnumerable<string> InferenceStream
         (
             int nTokensToPredict,
-            string[] reversePrompts,
+            string[]? reversePrompts=null,
             bool ignoreEos = false,
             int top_k = 40,
             float top_p = 0.8f,
@@ -107,16 +104,16 @@ namespace LLaMA.NET
                     break;
                 }
 
-                while (_embeds.Length > ContextParams.n_ctx - 1)
-                    Lobotomize();
-                    
+                // while (_embeds.Length > ContextParams.n_ctx - 1)
+                //     Lobotomize();
+
                 int tokenId = SampleToken(top_k, top_p, temp, repetition_penalty, mirostat, tauSurpriseOrEntropy, etaLearningRate, tailFreeSampling, typical_p, penalize_nl);
 
                 var res = Marshal.PtrToStringUTF8(LLama.llama_token_to_str(Context, tokenId)) ?? string.Empty;
                 msg += res;
                 int[] newEmbds = { tokenId };
                 _embeds = _embeds.Concat(newEmbds).ToArray();
-                LLama.llama_eval(Context, newEmbds, 1, _embeds.Length, _threads);
+                LLama.llama_eval(Context, newEmbds, 1, Math.Min(ContextParams.n_ctx, _embeds.Length), _threads);
 
                 // for (int y = 0; y < reversePrompts.Length; y++)
                 // {
@@ -149,9 +146,18 @@ namespace LLaMA.NET
             if (temp > 0)
             {
                 if (mirostat == 1)
-                    tokenId = MirostatV1(tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
+                {
+                    float mu = 2.0f * tauSurpriseOrEntropy;
+                    int m = 100;
+                    tokenId= LLama.llama_sample_token_mirostat(Context, ref candidates_p, tauSurpriseOrEntropy, etaLearningRate, m, &mu).ToInt32();
+                }
                 else if (mirostat == 2)
-                    tokenId = MirostatV2(temp, tauSurpriseOrEntropy, etaLearningRate, ref candidates_p).ToInt32();
+                {
+                    float mu = 2.0f * tauSurpriseOrEntropy;
+                    int m = 100;
+                    LLama.llama_sample_temperature(Context, ref candidates_p, temp);
+                    tokenId= LLama.llama_sample_token_mirostat(Context, ref candidates_p, tauSurpriseOrEntropy, etaLearningRate, m, &mu).ToInt32();
+                }
                 else
                 {
                     LLama.llama_sample_top_k(Context, ref candidates_p, top_k, 10);
@@ -169,40 +175,25 @@ namespace LLaMA.NET
             return tokenId;
         }
 
-        private nint MirostatV2(float temperature, float tau, float eta, ref llama_token_data_array candidates)
-        {
-            float mu = 2.0f * tau;
-            int m = 100;
-            LLama.llama_sample_temperature(Context, ref candidates, temperature);
-            return LLama.llama_sample_token_mirostat(Context, ref candidates, tau, eta, m, &mu);
-        }
-
-        private nint MirostatV1(float tau, float eta, ref llama_token_data_array candidates)
-        {
-            float mu = 2.0f * tau;
-            int m = 100;
-            return LLama.llama_sample_token_mirostat(Context, ref candidates, tau, eta, m, &mu);
-        }
-
         private void Lobotomize()
         {
-            var newEmbeds = firstPrompt.Concat(_embeds.Skip(firstPrompt.Length).Skip(_embeds.Length / 2)).ToArray();
-            _embeds = newEmbeds;
-            LLama.llama_eval(Context, _embeds, _embeds.Length, 1, _threads);
+            // var new_embeds = _embeds[(_embeds.Length / 2)..];
+            // LLama.llama_eval(Context, new_embeds, new_embeds.Length, 1, _threads);
+            // _embeds = new_embeds;
         }
 
-        private llama_token_data_array GetCandidates(float repetition_penalty, bool penalizeNewLines = false, bool penalizeSpaces = false)
+        private LlamaTokenDataArray GetCandidates(float repetition_penalty, bool penalizeNewLines = false, bool penalizeSpaces = false)
         {
             var logits = LLama.llama_get_logits(Context);
             var vocab = LLama.llama_n_vocab(Context);
             float newLineLogit = logits[LLama.llama_token_nl()];
             // float spaceLogit = logits[LLama.llama_token_bos()]; oops this isnt a space
 
-            var candidates = new List<llama_token_data>();
+            var candidates = new List<LlamaTokenData>();
             for (int token_id = 0; token_id < vocab; token_id++)
-                candidates.Add(new llama_token_data(token_id, logits[token_id], 0.0f));
+                candidates.Add(new LlamaTokenData(token_id, logits[token_id], 0.0f));
 
-            var candidates_p = new llama_token_data_array(candidates.ToArray());
+            var candidates_p = new LlamaTokenDataArray(candidates.ToArray());
 
             if (!penalizeNewLines)
                 logits[LLama.llama_token_nl()] = newLineLogit;
