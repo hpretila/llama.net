@@ -21,7 +21,7 @@ namespace LLaMA.NET
         public LLM(string modelPath, int threads = 2)
         {
             _threads = threads;
-            ContextParams.n_ctx = 2048;
+            ContextParams.n_ctx = 2049;
             ContextParams.seed = 1;
             ContextParams.f16_kv = true;
             ContextParams.embedding = false;
@@ -39,33 +39,33 @@ namespace LLaMA.NET
             var inputTokens = new int[prompt.Length + 1];
             var tokens = LLama.llama_tokenize(Context, prompt, inputTokens, inputTokens.Length, true);
 
-            if (tokens > ContextParams.n_ctx)
+            if (tokens >= ContextParams.n_ctx)
             {
                 yield return $"Prompt is too long. Max length is {ContextParams.n_ctx} tokens.";
                 yield break;
             }
             Array.Resize(ref inputTokens, tokens);
 
-            // int batchSize = 1; // Set the batch size
-            // for (int i = 0; i < inputTokens.Length; i += batchSize)
-            // {
-            //     LLama.llama_eval(Context, new[] { inputTokens[i] }, 1, _embeds.Length + i, _threads);
-            //     yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, inputTokens[i])) ?? string.Empty;
-            // }
-
-            int batchSize = 256; // Set the batch size
+            int batchSize = 1; // Set the batch size
             for (int i = 0; i < inputTokens.Length; i += batchSize)
             {
-                int count = Math.Min(batchSize, inputTokens.Length - i); // Calculate the number of tokens in the current batch
-                var batch = new int[count];
-                for (int j = 0; j < count; j++)
-                    batch[j] = inputTokens[i + j]; // Copy the token data from inputTokens to batch
-
-                LLama.llama_eval(Context, batch, count, Math.Min(ContextParams.n_ctx, _embeds.Length+i), _threads);
-
-                for (int j = 0; j < batch.Length; j++)
-                    yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, batch[j]));
+                LLama.llama_eval(Context, new[] { inputTokens[i] }, 1, Math.Min(ContextParams.n_ctx-1, _embeds.Length+i), _threads);
+                yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, inputTokens[i])) ?? string.Empty;
             }
+
+            // int batchSize = 256; // Set the batch size
+            // for (int i = 0; i < inputTokens.Length; i += batchSize)
+            // {
+            //     int count = Math.Min(batchSize, inputTokens.Length - i); // Calculate the number of tokens in the current batch
+            //     var batch = new int[count];
+            //     for (int j = 0; j < count; j++)
+            //         batch[j] = inputTokens[i + j]; // Copy the token data from inputTokens to batch
+
+            //     LLama.llama_eval(Context, batch, count, Math.Min(ContextParams.n_ctx-1, _embeds.Length+i), _threads);
+
+            //     for (int j = 0; j < batch.Length; j++)
+            //         yield return Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, batch[j])) ?? string.Empty;
+            // }
 
             _embeds = _embeds.Concat(inputTokens).ToArray();
             // while (_embeds.Length > ContextParams.n_ctx - 1)
@@ -113,7 +113,7 @@ namespace LLaMA.NET
                 msg += res;
                 int[] newEmbds = { tokenId };
                 _embeds = _embeds.Concat(newEmbds).ToArray();
-                LLama.llama_eval(Context, newEmbds, 1, Math.Min(ContextParams.n_ctx, _embeds.Length), _threads);
+                LLama.llama_eval(Context, newEmbds, 1, Math.Min(ContextParams.n_ctx-1, _embeds.Length), _threads);
 
                 // for (int y = 0; y < reversePrompts.Length; y++)
                 // {
