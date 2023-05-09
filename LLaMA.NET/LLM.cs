@@ -115,12 +115,24 @@ namespace LLaMA.NET
                 _embeds = _embeds.Concat(newEmbds).ToArray();
                 LLama.llama_eval(Context, newEmbds, 1, Math.Min(ContextParams.n_ctx-1, _embeds.Length), _threads);
 
+                // abort if AI keeps repeating itself
+                if(_embeds.Length > 3)
+                {
+                    var sum = 0;
+                    for(int y = _embeds.Length; y > _embeds.Length -3; y--)
+                        sum += _embeds[y];
+
+                    if(sum == _embeds[_embeds.Length] * 3)
+                        yield break;
+                }
+
+
                 // for (int y = 0; y < reversePrompts.Length; y++)
                 // {
                 //     var last = _embeds.TakeLast(3).ToArray();
-                //     var str = Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(Context, last[0]));
-                //     str += Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(Context, last[1]));
-                //     str += Marshal.PtrToStringAnsi(LLaMANativeMethods.llama_token_to_str(Context, last[2]));
+                //     var str = Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, last[0]));
+                //     str += Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, last[1]));
+                //     str += Marshal.PtrToStringAnsi(LLama.llama_token_to_str(Context, last[2]));
                 //     // str = str.Trim();
                 //     if(str.Contains('\n'))
                 //         yield return "\n";
