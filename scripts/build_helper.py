@@ -88,7 +88,7 @@ def build_llama_bin():
 
     # Build the llama.cpp binary
     print ("[BUILD] Invoking CMAKE.")
-    os.system(f'cd {build_dir} && cmake -DBUILD_SHARED_LIBS=ON .. && cmake --build . && cd {cwd}')
+    os.system(f'cd {build_dir} && cmake -DLLAMA_OPENBLAS=ON -DBUILD_SHARED_LIBS=ON .. && cmake --build . && cd {cwd}')
 
 def prepare_llama_bin():
     """
